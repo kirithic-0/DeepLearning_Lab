@@ -1,0 +1,630 @@
+% ==========================================================================
+% CS3807 - Deep Learning Laboratory - Experiment 2
+% Implementation of a Multi-Layer Perceptron (MLP) for Multi-Class Image
+% Classification (Fashion-MNIST)
+%
+% All numerical results, tables, and logs in this report were transcribed
+% directly from the executed notebook
+% "Experiment_2_MLP_Fashion_MNIST_1_.ipynb" (TensorFlow 2.20.0, CPU run,
+% seed = 42). Nothing below was re-run or re-derived by the assistant.
+%
+% FIGURES: All 10 figures were exported by the notebook via
+%   fig.savefig(path, format='eps', dpi=600, bbox_inches='tight')
+% with matplotlib rcParams set to font.family='serif',
+% font.serif=['Times New Roman','DejaVu Serif'], font.size=12 -- i.e. every
+% .eps file already IS 600 DPI / Times New Roman internally. The files
+% themselves are NOT attached yet; \includegraphics below points to the
+% expected filenames under figures/. Once you export the .eps files from
+% the notebook's figures/ folder into a figures/ folder next to this .tex
+% file, it will compile as-is with no further edits needed.
+%
+% COMPILATION NOTE: This document uses .eps images, so compile with
+%   latex Experiment_2_Report.tex && dvips ... && ps2pdf ...
+% or with pdflatex + the epstopdf package (shell-escape enabled), which
+% auto-converts each .eps to .pdf on the fly:
+%   pdflatex -shell-escape Experiment_2_Report.tex
+% ==========================================================================
+
+\documentclass[11pt]{article}
+\usepackage[margin=0.8in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{mathptmx}                 % Times-family text & math font
+\usepackage{amsmath,amssymb,booktabs,array,longtable}
+\usepackage{graphicx}
+\usepackage{epstopdf}                 % on-the-fly .eps -> .pdf for pdflatex
+\epstopdfsetup{update}
+\graphicspath{{figures/}}
+\usepackage{caption}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\setlist{nosep}
+\usepackage{xcolor}
+
+\begin{document}
+
+\begin{center}
+{\Large\textbf{Shiv Nadar University Chennai}}
+\end{center}
+
+\renewcommand{\arraystretch}{1.25}
+
+\begin{tabular}{|p{3.6cm}|p{7.6cm}|}
+\hline
+Degree \& Branch & B.Tech Artificial Intelligence \& Data Science, Semester V\\ \hline
+Subject & CS3807 -- Deep Learning Laboratory\\ \hline
+Name & R S Kirithic\\ \hline
+Section & AIDS `B'\\ \hline
+Register Number & 24011101082\\ \hline
+\end{tabular}
+
+\vspace{4mm}
+\begin{center}
+{\large\textbf{Experiment 2}}\\
+{\large\textbf{Implementation of a Multi-Layer Perceptron (MLP) for Multi-Class Image Classification}}
+\end{center}
+
+\section*{1. Objective}
+ This experiment builds a Multi-Layer Perceptron
+in TensorFlow/Keras and applies it to the Fashion-MNIST dataset. This experiment goes through preprocessing, flattening, model construction, training, evaluation and then
+run an automated hyperparameter search to check whether a systematic search could match or improve
+on a manually chosen baseline architecture.
+
+\section*{2. Tasks Performed}
+\begin{enumerate}
+\item Explored the Fashion-MNIST dataset.
+\item Preprocessed the images : normalized pixel values, flattened each image, and one hot encoded the labels.
+\item Built a baseline MLP (\texttt{Sequential}, two ReLU hidden layers, Softmax output).   
+\item Trained the baseline model for 20 epochs and tracked its progress.
+\item Evaluated the baseline model using standard classification metrics.
+\item Ran an automated randomized hyperparameter search with 5-fold cross-validation.
+\item Retrained the best configuration found by the search on the full training set.
+\item Compared the baseline and optimized models on accuracy, precision, recall, F1-score, and training time.
+\end{enumerate}
+
+\section*{3. Background Theory}
+An MLP consists of an input layer, one or more hidden layers, and an output layer.
+
+Each layer computes a weighted sum of its inputs and passes it through a non-linear activation called:
+\[
+z^{(l)}=W^{(l)}a^{(l-1)}+b^{(l)},\qquad
+a^{(l)}=f(z^{(l)})
+\]
+
+Fashion-MNIST is a classification problem,so the output layer uses a Softmax activation function so the
+ten outputs form the   probability distribution gets mapped to   the classes:
+\[
+\hat y=\mathrm{Softmax}(z)
+\]
+
+The network is trained by minimizing the the loss function :categorical cross-entropy loss between the predicted and
+true class distributions:
+\[
+L=-\sum_i y_i\log(\hat y_i)
+\]
+
+ ReLU and Softmax are differentiable 
+everywhere, which is  what allows gradient-based backpropagation to train multi-layer networks
+The baseline (manually specified) architecture used in this experiment is:
+\begin{center}
+784 $\rightarrow$ Dense(128, ReLU) $\rightarrow$ Dense(64, ReLU) $\rightarrow$ Dense(10, Softmax)
+\end{center}
+
+
+
+\section*{4. Dataset Description}
+Dataset: Fashion-MNIST
+
+\begin{center}
+\begin{tabular}{|l|l|}
+\hline
+Training Images & 60,000 -- shape \texttt{(60000, 28, 28)} \\ \hline
+Testing Images & 10,000 -- shape \texttt{(10000, 28, 28)} \\ \hline
+Classes & 10 \\ \hline
+Image Size & $28\times28$ \\ \hline
+\end{tabular}
+\end{center}
+
+Classes are : T-shirt/top, Trouser, Pullover, Dress, Coat, Sandal, Shirt, Sneaker, Bag, Ankle boot.
+
+\section*{5. Experimental Procedure and Results}
+
+\subsection*{Task 1: Dataset Exploration}
+I loaded Fashion-MNIST via \texttt{keras.datasets.fashion\_mnist} and printed the dataset
+dimensions, number of classes, and image size:
+
+{\scriptsize
+\begin{verbatim}
+Training images shape: (60000, 28, 28)
+Training labels shape: (60000,)
+Testing images shape : (10000, 28, 28)
+Testing labels shape : (10000,)
+Number of classes    : 10
+Image size            : 28 x 28
+\end{verbatim}
+}
+
+
+
+\noindent\textbf{Observation:} The images are $28\times28$ grayscale, low resolution. So its almost impossible to see the textures of the clothing due it to be low resolution and grayscale ,so mostly the outline is what would help us distinguish different classes .
+
+\begin{figure}[h!]
+\centering
+\includegraphics[width=0.6\textwidth]{02_class_distribution.eps}
+\caption{Class Distribution (Training Set).}
+\end{figure}
+
+\noindent\textbf{Observation:} There exactly 6,000 samples per class.The dataset is balanced, so we don't need to do 
+class weighting or resampling was needed before training.
+
+\subsection*{Task 2: Data Preprocessing}
+Since Dense layers require a one-dimensional feature vector, each $28\times28$ image needed to be
+flattened into a 784-dimensional vector ($28\times28=784$). pipeline of  steps:
+\begin{enumerate}
+\item Normalized pixel values from $[0,255]$ to $[0,1]$.
+\item Flattened each $28\times28$ image into a 784-dimensional vector.
+\item Converted integer labels into one-hot vectors (10 classes).
+\end{enumerate}
+
+{\scriptsize
+\begin{verbatim}
+Shape before preprocessing:
+  x_train: (60000, 28, 28)  dtype: uint8
+  x_test : (10000, 28, 28)
+
+Shape after preprocessing:
+  x_train: (60000, 784)  dtype: float32
+  x_test : (10000, 784)
+  y_train: (60000, 10)
+  y_test : (10000, 10)
+
+Pixel value range: [0.00, 1.00]
+\end{verbatim}
+}
+
+\subsection*{Task 3: Model Construction (Baseline)}
+MLP layer structure is  : an input
+layer of 784 units, followed by two ReLU hidden layers (128 and 64 units), followed by a 10-unit
+Softmax output layer.
+
+\textbf{Model: "Baseline\_MLP"}
+
+\begin{center}
+\begin{tabular}{|l|l|r|}
+\hline
+\textbf{Layer (type)} & \textbf{Output Shape} & \textbf{Param \#} \\ \hline
+hidden\_layer\_1 (Dense) & (None, 128) & 100,480 \\ \hline
+hidden\_layer\_2 (Dense) & (None, 64)  & 8,256   \\ \hline
+output\_layer (Dense)    & (None, 10)  & 650     \\ \hline
+\end{tabular}
+\end{center}
+
+Total params: 109,386-- all trainable.
+
+\subsection*{Task 4: Model Training (Baseline)}
+I compiled the baseline model with the Adam optimizer, categorical cross-entropy loss, and
+accuracy metric, then trained it for 20 epochs with batch size 32 and a 10\% validation split.
+
+\begin{center}
+{\small
+\begin{tabular}{|c|c|c|c|c|}
+\hline
+\textbf{Epoch} & \textbf{Train Acc} & \textbf{Train Loss} & \textbf{Val Acc} & \textbf{Val Loss} \\ \hline
+1  & 0.8234 & 0.4988 & 0.8510 & 0.3987 \\ \hline
+2  & 0.8646 & 0.3720 & 0.8593 & 0.3715 \\ \hline
+3  & 0.8774 & 0.3347 & 0.8618 & 0.3599 \\ \hline
+4  & 0.8857 & 0.3105 & 0.8647 & 0.3664 \\ \hline
+5  & 0.8917 & 0.2922 & 0.8673 & 0.3726 \\ \hline
+6  & 0.8978 & 0.2748 & 0.8675 & 0.3648 \\ \hline
+7  & 0.9026 & 0.2626 & 0.8703 & 0.3689 \\ \hline
+8  & 0.9064 & 0.2494 & 0.8678 & 0.3748 \\ \hline
+9  & 0.9096 & 0.2400 & 0.8697 & 0.3792 \\ \hline
+10 & 0.9135 & 0.2301 & 0.8687 & 0.3989 \\ \hline
+11 & 0.9174 & 0.2217 & 0.8767 & 0.3793 \\ \hline
+12 & 0.9202 & 0.2111 & 0.8707 & 0.3953 \\ \hline
+13 & 0.9234 & 0.2050 & 0.8758 & 0.3984 \\ \hline
+14 & 0.9251 & 0.1983 & 0.8755 & 0.4091 \\ \hline
+15 & 0.9272 & 0.1922 & 0.8712 & 0.4399 \\ \hline
+16 & 0.9307 & 0.1858 & 0.8768 & 0.4243 \\ \hline
+17 & 0.9311 & 0.1818 & 0.8770 & 0.4367 \\ \hline
+18 & 0.9329 & 0.1763 & 0.8793 & 0.4311 \\ \hline
+19 & 0.9358 & 0.1698 & 0.8787 & 0.4695 \\ \hline
+20 & 0.9382 & 0.1640 & 0.8835 & 0.4452 \\ \hline
+\end{tabular}
+}
+\end{center}
+
+\textbf{ training time on google collab: 166.43 seconds.}
+
+\begin{figure}[h!]
+\centering
+\includegraphics[width=0.6\textwidth]{03_training_accuracy_vs_epoch.eps}
+\caption{Training Accuracy vs. Epoch (Baseline).}
+\end{figure}
+
+\noindent\textbf{Observation:} Training accuracy goes from about 82\% at epoch 1 to nearly 94\% by
+epoch 20, flattening out toward the end. No spikes or drops in the curve.
+
+\begin{figure}[h!]
+\centering
+\includegraphics[width=0.6\textwidth]{04_validation_accuracy_vs_epoch.eps}
+\caption{Validation Accuracy vs. Epoch (Baseline).}
+\end{figure}
+
+\noindent\textbf{Observation:} Validation accuracy goes from 85.10\% to 88.35\% over the 20
+epochs, following the training curve but with a gap that widens slightly over time. It slightly starts 
+overfitting on the last few epochs(So even more epochs would make it overfit).
+
+\begin{figure}[h!]
+\centering
+\includegraphics[width=0.6\textwidth]{05_training_loss_vs_epoch.eps}
+\caption{Training Loss vs. Epoch (Baseline).}
+\end{figure}
+
+\noindent\textbf{Observation:} The Loss decreases every epoch, from about 0.50 to 0.16, with no bumps.
+Mirrors the accuracy curve above.
+
+\begin{figure}[h!]
+\centering
+\includegraphics[width=0.6\textwidth]{06_validation_loss_vs_epoch.eps}
+\caption{Validation Loss vs. Epoch (Baseline).}
+\end{figure}
+
+\noindent\textbf{Observation:} Validation loss drops for the first few epochs, down to about 0.36
+by epoch 3, then rises steadily to 0.4452 by epoch 20, even as training loss keeps falling. Overfitting
+starts around epoch 3--4.
+
+\subsection*{Task 5: Model Evaluation (Baseline)}
+I computed accuracy, weighted precision, weighted recall, and weighted F1-score on the
+10,000-image test set.
+
+{\scriptsize
+\begin{verbatim}
+Baseline Test Accuracy : 0.8753
+Baseline Precision      : 0.8765
+Baseline Recall         : 0.8753
+Baseline F1-score       : 0.8739
+\end{verbatim}
+}
+
+\textbf{Classification Report (Baseline Model):}
+
+{\scriptsize
+\begin{verbatim}
+              precision    recall  f1-score   support
+
+ T-shirt/top       0.77      0.87      0.82      1000
+     Trouser       0.99      0.97      0.98      1000
+    Pullover       0.76      0.80      0.78      1000
+       Dress       0.85      0.91      0.88      1000
+        Coat       0.78      0.82      0.80      1000
+      Sandal       0.96      0.97      0.97      1000
+       Shirt       0.77      0.58      0.66      1000
+     Sneaker       0.91      0.97      0.94      1000
+         Bag       0.99      0.94      0.97      1000
+  Ankle boot       0.98      0.92      0.95      1000
+
+    accuracy                           0.88     10000
+   macro avg       0.88      0.88      0.87     10000
+weighted avg       0.88      0.88      0.87     10000
+\end{verbatim}
+}
+
+\begin{figure}[h!]
+\centering
+\includegraphics[width=0.62\textwidth]{07_confusion_matrix.pdf}
+\caption{Confusion Matrix -- Baseline MLP.}
+\end{figure}
+
+\noindent\textbf{Observation:} Most predictions fall on the diagonal. \emph{Shirt} is the weakest
+class (recall 0.58), confused mainly with \emph{T-shirt/top}, \emph{Pullover}, and \emph{Coat}.
+These are all upper-body garments with similar outlines at $28\times28$ resolution, and the model
+has no spatial information to distinguish them beyond raw pixel values.
+
+\subsection*{Task 6: Automated Hyperparameter Optimization}
+we can use a RandomizedSearchCV-style procedure + random sampling of hyperparameter combinations,
+each evaluated with 5-fold stratified cross-validation .
+
+\begin{center}
+\begin{tabular}{|p{5cm}|p{7cm}|}
+\hline
+Hyperparameter & Candidate Values\\
+\hline
+Hidden Layers & 1, 2, 3\\
+Hidden Neurons & 32, 64, 128, 256\\
+Learning Rate & 0.1, 0.01, 0.001\\
+Batch Size & 16, 32, 64, 128\\
+Epochs & 10, 20, 30\\
+Optimizer & SGD, Adam, RMSProp\\
+Activation Function & ReLU, Tanh, Sigmoid\\
+Dropout Rate & 0.0, 0.2, 0.5\\
+\hline
+\end{tabular}
+\end{center}
+
+The full search space contains $3\times4\times3\times4\times3\times3\times3\times3 = 11{,}664$
+combinations, so I sampled 15 combinations (\texttt{n\_iter = 15}) rather than searching
+exhaustively.
+
+
+
+I defined a tunable model builder to construct an MLP with configurable hidden layers, hidden
+neurons, learning rate, optimizer, activation function, and dropout rate, then randomly sampled 15
+combinations (\texttt{N\_ITER = 15}) and evaluated each with 5-fold stratified cross-validation
+(\texttt{N\_SPLITS = 5}) on a 6,000-image subsample of the training set, using a fixed
+reproducibility seed.
+
+\textbf{Cross-validation search results (15 sampled combinations, 5-fold CV, subsampled on 6,000
+training images):}
+
+\begin{center}
+{\scriptsize
+\begin{tabular}{|c|l|c|c|c|c|c|c|c|c|}
+\hline
+\textbf{\#} & \textbf{Optimizer} & \textbf{LR} & \textbf{Neurons} & \textbf{Layers} & \textbf{Epochs} & \textbf{Dropout} & \textbf{Batch} & \textbf{Activation} & \textbf{Mean CV Acc ($\pm$std)} \\ \hline
+1  & Adam     & 0.001 & 256 & 1 & 20 & 0.2 & 128 & Tanh    & \textbf{0.8422 ($\pm$0.0047)} \\ \hline
+2  & RMSProp  & 0.01  & 256 & 3 & 20 & 0.5 & 16  & ReLU    & 0.5838 ($\pm$0.0168) \\ \hline
+3  & RMSProp  & 0.001 & 128 & 3 & 20 & 0.2 & 32  & Tanh    & 0.8310 ($\pm$0.0137) \\ \hline
+4  & Adam     & 0.001 & 32  & 1 & 10 & 0.2 & 32  & Tanh    & 0.8360 ($\pm$0.0127) \\ \hline
+5  & Adam     & 0.001 & 64  & 2 & 30 & 0.2 & 128 & Sigmoid & 0.8287 ($\pm$0.0078) \\ \hline
+6  & Adam     & 0.1   & 64  & 1 & 30 & 0.5 & 32  & Tanh    & 0.4677 ($\pm$0.0642) \\ \hline
+7  & Adam     & 0.1   & 32  & 1 & 20 & 0.2 & 64  & Tanh    & 0.6302 ($\pm$0.0355) \\ \hline
+8  & Adam     & 0.001 & 256 & 1 & 20 & 0.2 & 16  & ReLU    & 0.8337 ($\pm$0.0105) \\ \hline
+9  & Adam     & 0.001 & 256 & 3 & 20 & 0.2 & 16  & Tanh    & 0.8262 ($\pm$0.0164) \\ \hline
+10 & Adam     & 0.001 & 256 & 2 & 10 & 0.5 & 32  & Tanh    & 0.8282 ($\pm$0.0094) \\ \hline
+11 & RMSProp  & 0.001 & 32  & 3 & 30 & 0.5 & 128 & Sigmoid & 0.4967 ($\pm$0.0227) \\ \hline
+12 & RMSProp  & 0.01  & 128 & 1 & 10 & 0.5 & 128 & Sigmoid & 0.8022 ($\pm$0.0108) \\ \hline
+13 & RMSProp  & 0.01  & 128 & 3 & 10 & 0.2 & 128 & Sigmoid & 0.7777 ($\pm$0.0332) \\ \hline
+14 & SGD      & 0.001 & 32  & 1 & 30 & 0.2 & 16  & Sigmoid & 0.6817 ($\pm$0.0111) \\ \hline
+15 & RMSProp  & 0.1   & 256 & 2 & 10 & 0.5 & 32  & ReLU    & 0.0995 ($\pm$0.0023) \\ \hline
+\end{tabular}
+}
+\end{center}
+
+\textbf{Best Hyperparameters Found} (combination \#1): hidden\_layers = 1, hidden\_neurons = 256,
+learning\_rate = 0.001, optimizer = adam, activation = tanh, dropout\_rate = 0.2, batch\_size =
+128, epochs = 20. \textbf{Best cross-validation accuracy: 0.8422.}
+
+\begin{figure}[h!]
+\centering
+\includegraphics[width=0.7\textwidth]{08_hyperparameter_search_results.pdf}
+\caption{Hyperparameter Search Results (Randomized Search, 15 combinations, 5-fold CV).}
+\end{figure}
+
+\noindent\textbf{Observation:} Accuracy across the 15 trials ranges from 0.0995 (learning rate
+0.1, RMSProp) to 0.8422 (best configuration).
+Most important :Learning rate and optimizer
+Less important : dropout, batch size, and number of layers 
+
+\subsection*{Task 7: Retraining with Optimized Hyperparameters (found in the above task)}
+ rebuilt the model  using the tunable model builder and retrained it on the full training set for 20 epochs at batch size 128, with a 10\% validation split.
+
+\textbf{Model: "sequential\_1"} (optimized architecture)
+
+\begin{center}
+\begin{tabular}{|l|l|r|}
+\hline
+\textbf{Layer (type)} & \textbf{Output Shape} & \textbf{Param \#} \\ \hline
+dense\_3 (Dense)      & (None, 256) & 200,960 \\ \hline
+dropout\_2 (Dropout)  & (None, 256) & 0       \\ \hline
+dense\_4 (Dense)      & (None, 10)  & 2,570   \\ \hline
+\end{tabular}
+\end{center}
+
+Total params: 203,530 (795.04 KB) -- all trainable.
+
+\begin{center}
+{\small
+\begin{tabular}{|c|c|c|c|c|}
+\hline
+\textbf{Epoch} & \textbf{Train Acc} & \textbf{Train Loss} & \textbf{Val Acc} & \textbf{Val Loss} \\ \hline
+1  & 0.8033 & 0.5513 & 0.8443 & 0.4290 \\ \hline
+2  & 0.8469 & 0.4300 & 0.8527 & 0.4031 \\ \hline
+3  & 0.8584 & 0.3951 & 0.8627 & 0.3712 \\ \hline
+4  & 0.8653 & 0.3743 & 0.8638 & 0.3671 \\ \hline
+5  & 0.8691 & 0.3591 & 0.8707 & 0.3554 \\ \hline
+6  & 0.8748 & 0.3444 & 0.8738 & 0.3406 \\ \hline
+7  & 0.8773 & 0.3342 & 0.8743 & 0.3394 \\ \hline
+8  & 0.8817 & 0.3239 & 0.8770 & 0.3358 \\ \hline
+9  & 0.8845 & 0.3153 & 0.8780 & 0.3371 \\ \hline
+10 & 0.8874 & 0.3067 & 0.8807 & 0.3332 \\ \hline
+11 & 0.8891 & 0.2990 & 0.8778 & 0.3296 \\ \hline
+12 & 0.8919 & 0.2929 & 0.8813 & 0.3196 \\ \hline
+13 & 0.8923 & 0.2884 & 0.8810 & 0.3226 \\ \hline
+14 & 0.8959 & 0.2812 & 0.8828 & 0.3183 \\ \hline
+15 & 0.8981 & 0.2746 & 0.8812 & 0.3252 \\ \hline
+16 & 0.8983 & 0.2727 & 0.8815 & 0.3230 \\ \hline
+17 & 0.9022 & 0.2655 & 0.8842 & 0.3155 \\ \hline
+18 & 0.9018 & 0.2636 & 0.8870 & 0.3104 \\ \hline
+19 & 0.9043 & 0.2579 & 0.8867 & 0.3104 \\ \hline
+20 & 0.9060 & 0.2531 & 0.8875 & 0.3110 \\ \hline
+\end{tabular}
+}
+\end{center}
+
+\textbf{Optimized model training time: 88.70 seconds} (vs.\ 166.43 s for the baseline -- a 46.7\%
+reduction).
+
+{\scriptsize
+\begin{verbatim}
+Optimized Test Accuracy : 0.8810
+Optimized Precision      : 0.8813
+Optimized Recall         : 0.8810
+Optimized F1-score       : 0.8798
+\end{verbatim}
+}
+
+\textbf{Classification Report (Optimized Model):}
+
+{\scriptsize
+\begin{verbatim}
+              precision    recall  f1-score   support
+
+ T-shirt/top       0.80      0.87      0.83      1000
+     Trouser       0.99      0.97      0.98      1000
+    Pullover       0.76      0.84      0.80      1000
+       Dress       0.85      0.91      0.88      1000
+        Coat       0.84      0.77      0.80      1000
+      Sandal       0.95      0.97      0.96      1000
+       Shirt       0.75      0.62      0.68      1000
+     Sneaker       0.93      0.95      0.94      1000
+         Bag       0.98      0.97      0.97      1000
+  Ankle boot       0.97      0.93      0.95      1000
+
+    accuracy                           0.88     10000
+   macro avg       0.88      0.88      0.88     10000
+weighted avg       0.88      0.88      0.88     10000
+\end{verbatim}
+}
+
+\begin{figure}[h!]
+\centering
+\includegraphics[width=0.62\textwidth]{07b_confusion_matrix_optimized.pdf}
+\caption{Confusion Matrix -- Optimized MLP.}
+\end{figure}
+
+\noindent\textbf{Observation:} \emph{Shirt} is still the weakest class, recall 0.62 (up from 0.58
+in the baseline). \emph{Coat} recall dropped slightly, to 0.77 from 0.82. Overall pattern is
+similar to the baseline's confusion matrix, consistent with the close aggregate metrics between
+the two models.
+
+\subsection*{Task 8: Baseline vs.\ Optimized Comparison}
+I compared accuracy, precision, recall, F1-score, and training time between the baseline and
+optimized models.
+
+\begin{center}
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Metric} & \textbf{Baseline} & \textbf{Optimized} \\ \hline
+Accuracy           & 0.8753   & 0.8810 \\ \hline
+Precision          & 0.8765   & 0.8813 \\ \hline
+Recall             & 0.8753   & 0.8810 \\ \hline
+F1-score           & 0.8739   & 0.8798 \\ \hline
+Training Time (s)  & 166.43   & 88.70  \\ \hline
+\end{tabular}
+\end{center}
+
+\begin{figure}[h!]
+\centering
+\includegraphics[width=0.6\textwidth]{09_best_model_accuracy_comparison.pdf}
+\caption{Best Model Accuracy Comparison: Baseline vs. Optimized.}
+\end{figure}
+
+\noindent\textbf{Observation:} The optimized model matches or exceeds the baseline on every metric
+and trains in roughly half the time (166.43 s vs.\ 88.70 s). A single wide hidden layer found via
+the search performed comparably to the hand-picked two-layer baseline, with lower training time.
+
+\section*{6. Performance Tables}
+
+\textbf{Best Hyperparameters}
+
+\begin{center}
+\begin{tabular}{|p{6cm}|p{6cm}|}
+\hline
+Hidden Layers & 1 \\\hline
+Hidden Neurons & 256 \\\hline
+Learning Rate & 0.001 \\\hline
+Batch Size & 128 \\\hline
+Optimizer & Adam \\\hline
+Activation Function & Tanh \\\hline
+Epochs & 20 \\\hline
+Dropout & 0.2 \\\hline
+Cross-validation Accuracy & 0.8422 \\\hline
+Testing Accuracy & 0.8810 \\\hline
+\end{tabular}
+\end{center}
+
+\vspace{3mm}
+
+\textbf{Performance Comparison}
+
+\begin{center}
+\begin{tabular}{|p{4cm}|c|c|}
+\hline
+Metric & Baseline & Optimized\\
+\hline
+Accuracy&0.8753&0.8810\\
+Precision&0.8765&0.8813\\
+Recall&0.8753&0.8810\\
+F1-score&0.8739&0.8798\\
+Training Time (s)&166.43&88.70\\
+\hline
+\end{tabular}
+\end{center}
+
+\section*{7. Discussion}
+
+\begin{enumerate}
+\item \textbf{Which optimization method was used?}\\
+I used a RandomizedSearchCV-style procedure instead of a GridSearchCV this is because there are in total 11,664 combinations 
+so i used randomized search with the parameter sampler with the 11,664-combination search space and
+each evaluated with 5-fold stratified cross-validation on a 6,000-image subsample. 
+
+\item \textbf{Which hyperparameters were selected?}\\
+THe final optimized hyperparameters are 
+Hidden Layers = 1, Hidden Neurons = 256, Learning Rate = 0.001, Batch Size = 128, Optimizer =
+Adam, Activation = Tanh, Epochs = 20, Dropout = 0.2 
+which achived a  a final validation score of 0.8422
+
+\item \textbf{Did optimization improve performance?}\\
+Yes , the test accuracy improved from 0.8753to 0.8810 (optimized); precision from 0.8765 to
+0.8813; recall from 0.8753 to 0.8810; F1-score from 0.8739 to 0.8798. It did improve but by that much the best improvement is that its a single layer so it trained much faster,
+
+\item \textbf{Which hyperparameter had the greatest impact?}\\
+Learning rate had by far the largest impact: every trial with learning rate 0.1 collapsed to poor
+accuracy (0.0995, 0.4677, 0.6302) .Learning rate of 0.001 is the best one .
+
+
+\item \textbf{Compare Grid Search and Randomized Search.}\\
+Grid Search  evaluates every combination in the search space (here, 11,664
+combinations), which guarantees the optimum within the grid but scales combinatorially with the cross-validation at this scale. Randomized Search samples a fixed, much smaller number of
+combinations (15 here); it trades the guarantee of finding the true optimum for far better
+computational efficiency, and, as I saw, it still located a strong configuration (0.8422 CV
+accuracy) in a small fraction of the compute an exhaustive search would have needed.
+
+\item \textbf{Recommend the best MLP configuration.}\\
+I would recommend the configuration found by the search: a single hidden layer of 256 units with
+Tanh activation and 0.2 dropout, trained with the Adam optimizer (learning rate 0.001) for 20
+epochs at batch size 128. It achieved the best cross-validation accuracy (0.8422) among all 15 sampled 
+configurations from the randomized Search, generalized to 0.8810 test accuracy, and trained in roughly half the time of the
+deeper, manually chosen baseline (88.70 s vs.\ 166.43 s).
+\end{enumerate}
+
+\begin{itemize}
+\item Learning rate had the largest effect on hyperparameter search results. Every bad combination had the  learning rate 0.1, regardless of other settings.
+\item Both the baseline and the optimized model performed worst on the \emph{Shirt} class,
+suggesting the bottleneck is the input data itself 
+representation losing spatial information,
+rather than the specific architecture used.
+\end{itemize}
+
+\section*{8. Conclusion}
+\begin{itemize}
+\item I Implemented an MLP classifier for Fashion-MNIST and I have done  the complete pipeline from data
+preprocessing (normalization, flattening to 784 dimensions, one-hot encoding) through model
+construction, training, evaluation, and automated hyperparameter optimization.
+\item The manually specified baseline (784 $\to$ 128 $\to$ 64 $\to$ 10, Adam, 20 epochs, batch 32)
+reached \textbf{87.53\% test accuracy} in 166.43 s.
+\item A 15-combination randomized search with 5-fold cross-validation identified a
+shallower-but-wider configuration (784 $\to$ 256 (Tanh, dropout 0.2) $\to$ 10, Adam, learning rate
+0.001, batch 128, 20 epochs) that reached \textbf{88.10\% test accuracy} in 88.70 s on the full
+training set -- a small accuracy gain alongside a substantial (46.7\%) reduction in training time.
+\item Both models struggled most with the \emph{Shirt} class, which is visually similar to
+\emph{T-shirt/top}, \emph{Pullover}, and \emph{Coat}, indicating that flattened-pixel MLPs discard
+the spatial structure that would help disambiguate these garments -- a limitation that
+convolutional architectures are better suited to address and also the data is too simplified .
+\item Overall, this experiment demonstrated the practical benefit of systematic, automated
+hyperparameter search over manual tuning, both in final accuracy and in training efficiency, and
+built directly on the foundations (weights, biases, activation functions, gradient-based learning)
+laid down in Experiment 1.
+\end{itemize}
+
+\section*{9. References}
+\begin{enumerate}
+\item I. Goodfellow, Y. Bengio and A. Courville, \emph{Deep Learning}, MIT Press, 2016.
+\item C. M. Bishop, \emph{Pattern Recognition and Machine Learning}, Springer, 2006.
+\item S. Haykin, \emph{Neural Networks and Learning Machines}, Pearson, 2009.
+\item Fashion-MNIST Dataset.
+\item TensorFlow/Keras Documentation.
+\end{enumerate}
+
+\end{document}
