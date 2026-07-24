@@ -13,8 +13,21 @@ instead of an error term that is specific to each hidden neuron.
 
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 
 np.random.seed(42)
+
+# Font & export settings: Times New Roman, size 13, 600 DPI, PDF output.
+# Times New Roman itself is a proprietary Microsoft font and is not installed
+# on this system, so Liberation Serif is used instead, a metrically
+# compatible, open-source substitute. If real Times New Roman is installed
+# locally, change FONT_NAME below and re-run.
+FONT_NAME = "Liberation Serif"  # swap for "Times New Roman" if installed locally
+mpl.rcParams["font.family"] = "serif"
+mpl.rcParams["font.serif"] = [FONT_NAME, "Times New Roman", "DejaVu Serif"]
+mpl.rcParams["font.size"] = 13
+mpl.rcParams["savefig.dpi"] = 600
+mpl.rcParams["figure.dpi"] = 600
 
 
 class NaiveMLP:
