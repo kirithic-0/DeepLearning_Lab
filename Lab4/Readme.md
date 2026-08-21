@@ -41,14 +41,3 @@ from google.colab import files
 files.download('figures.zip')
 ```
 
-## Rebuilding the report
-
-The figures shipped in `report_bundle/figures/` right now are placeholders, pulled from the notebook's inline preview images, not the real 600 DPI exports, and from a run where the Times New Roman fix hadn't been applied yet. Before submitting, replace them with the real ones from your `figures.zip`.
-
-To compile: Overleaf handles `.eps` figures automatically, just upload the whole `report_bundle/` folder as-is. Compiling locally with `pdflatex` needs the `epstopdf` conversion step to work (either `-shell-escape` or a distribution that allows it), and needs two passes for the cross-references (figure and table numbers) to resolve.
-
-## Things worth remembering about this specific run
-
-- Fine-tuning was the single biggest lever pulled in the whole experiment, bigger than any hyperparameter change: 35.71% frozen, 50.98% after unfreezing the last block.
-- ResNet50's fine-tuning run destabilized right after unfreezing (validation accuracy briefly crashed), most likely because the learning rate wasn't lowered for the fine-tuning stage. Worth trying a smaller LR there if repeating this.
-- The from-scratch AlexNet never learned anything, stuck at exactly chance level (10%) the whole run. Points to a training setup issue (no batch norm, learning rate too high for random init), not the architecture being wrong.
