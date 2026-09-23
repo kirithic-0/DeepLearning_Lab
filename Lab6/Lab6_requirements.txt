@@ -1,0 +1,12 @@
+# TensorFlow's native-Windows GPU support tops out at 2.10, which needs Python 3.10.
+# On Linux / WSL2 / Mac, drop this upper bound and just use `pip install tensorflow`.
+tensorflow<2.11
+numpy<1.24
+matplotlib>=3.5.0
+scikit-learn>=1.0.0
+opencv-python>=4.5.0        # reads the UCF101 .avi frames in the video section
+jupyter>=1.0.0
+ipykernel>=6.0.0
+
+# If TensorFlow raises a protobuf-related import error after installing the above:
+# pip install "protobuf==3.19.6"
